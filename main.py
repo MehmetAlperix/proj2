@@ -7,6 +7,9 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.spinner import Spinner
 from kivy.uix.textinput import TextInput
 from kivy.properties import ObjectProperty
+from kivy.uix.togglebutton import ToggleButton
+from kivy.uix.screenmanager import ScreenManager, Screen
+from kivy.clock import Clock
 from datetime import datetime
 
 
@@ -67,18 +70,22 @@ class DatePickerPopup(Popup):
         selected_day = int(self.day_spinner.text)
         selected_month = datetime.strptime(self.month_spinner.text, '%B').month
         selected_year = int(self.year_spinner.text)
-        selected_date = datetime(selected_year, selected_month, selected_day)
-        current_date = datetime.now()
 
-        if selected_date <= current_date:
-            self.birth_date = selected_date.strftime('%B %d, %Y')
-            self.input_field.text = self.birth_date
-            self.dismiss()
-        else:
-            self.dismiss()
+        try:
+            selected_date = datetime(selected_year, selected_month, selected_day)
+            current_date = datetime.now()
+            if selected_date <= current_date:
+                self.birth_date = selected_date.strftime('%B %d, %Y')
+                self.input_field.text = self.birth_date
+            else:
+                Popup(title="Invalid Date",
+                      content=Label(text="Birth date cannot be in the future."),
+                      size_hint=(None, None), size=(300, 150)).open()
+        except ValueError:
             Popup(title="Invalid Date",
-                  content=Label(text="Birth date cannot be in the future."),
+                  content=Label(text="Please enter a valid date."),
                   size_hint=(None, None), size=(300, 150)).open()
+        self.dismiss()
 
 
 class SelectionPopup(Popup):
@@ -163,69 +170,63 @@ class GenderSelectionPopup(Popup):
         self.input_field.text = instance.text
         self.dismiss()
 
-
-class SurveyPage(GridLayout):
+class SurveyPage(Screen):
     def __init__(self, **kwargs):
         super(SurveyPage, self).__init__(**kwargs)
         self.cols = 2
-        self.add_widget(Label(text='Name-surname:'))
+        layout = GridLayout(cols=2)
+
+        # Initialize TextInput fields
         self.name_input = TextInput(multiline=False)
-        self.name_input.bind(text=self.check_all_filled)
-        self.add_widget(self.name_input)
-
-        self.add_widget(Label(text='Birth Date:'))
         self.birth_date_input = Button(text='Select Date')
-        self.birth_date_input.bind(on_press=self.show_date_picker)
-        self.add_widget(self.birth_date_input)
-
-        self.add_widget(Label(text='Education Level:'))
         self.education_input = TextInput(multiline=False)
-        self.education_input.bind(text=self.check_all_filled)
-        self.add_widget(self.education_input)
-
-        self.add_widget(Label(text='City:'))
         self.city_input = TextInput(multiline=False)
-        self.city_input.bind(text=self.check_all_filled)
-        self.add_widget(self.city_input)
-
-        self.add_widget(Label(text='Gender:'))
         self.gender_input = Button(text='Select Gender')
-        self.gender_input.bind(on_press=self.show_gender_popup)
-        self.add_widget(self.gender_input)
-
-        self.add_widget(Label(text='AI model/type:'))
         self.ai_input = Button(text='Select AI Model')
-        self.ai_input.bind(on_press=self.show_ai_popup)
-        self.add_widget(self.ai_input)
-
-        self.add_widget(Label(text='Defects or cons:'))
         self.defects_input = TextInput(multiline=True)
-        self.defects_input.bind(text=self.check_all_filled)
-        self.add_widget(self.defects_input)
-
-        self.add_widget(Label(text='Beneficial use cases of AI:'))
         self.use_cases_input = TextInput(multiline=True)
-        self.use_cases_input.bind(text=self.check_all_filled)
-        self.add_widget(self.use_cases_input)
+
+        # Bind events and add widgets to layout
+        self.bind_inputs()
+
+        layout.add_widget(Label(text='Name-surname:'))
+        layout.add_widget(self.name_input)
+        layout.add_widget(Label(text='Birth Date:'))
+        layout.add_widget(self.birth_date_input)
+        layout.add_widget(Label(text='Education Level:'))
+        layout.add_widget(self.education_input)
+        layout.add_widget(Label(text='City:'))
+        layout.add_widget(self.city_input)
+        layout.add_widget(Label(text='Gender:'))
+        layout.add_widget(self.gender_input)
+        layout.add_widget(Label(text='AI model/type:'))
+        layout.add_widget(self.ai_input)
+        layout.add_widget(Label(text='Defects or cons:'))
+        layout.add_widget(self.defects_input)
+        layout.add_widget(Label(text='Beneficial use cases of AI:'))
+        layout.add_widget(self.use_cases_input)
 
         self.send_button = Button(text='Send', background_color=(0.2, 0.2, 0.2, 1), disabled=True)
         self.send_button.bind(on_press=self.send_survey)
-        self.add_widget(self.send_button)
+        layout.add_widget(self.send_button)
 
-    def show_date_picker(self, instance):
-        popup = DatePickerPopup(self.birth_date_input)
-        popup.open()
+        self.add_widget(layout)
 
-    def show_gender_popup(self, instance):
-        popup = GenderSelectionPopup(self.gender_input)
-        popup.open()
+        # Schedule the initial check of all fields filled
+        Clock.schedule_once(self.check_all_filled)
 
-    def show_ai_popup(self, instance):
-        options = ['ChatGPT', 'Bard', 'Claude', 'Copilot']
-        popup = SelectionPopup(options, self.ai_input, self.defects_input, 'Select AI Model')
-        popup.open()
+    def bind_inputs(self):
+        # Bind the check_all_filled method to the text property of each TextInput field
+        self.name_input.bind(text=self.check_all_filled)
+        self.birth_date_input.bind(on_release=self.show_date_picker)
+        self.education_input.bind(text=self.check_all_filled)
+        self.city_input.bind(text=self.check_all_filled)
+        self.gender_input.bind(on_press=self.show_gender_popup)
+        self.ai_input.bind(on_press=self.show_ai_popup)
+        self.defects_input.bind(text=self.check_all_filled)
+        self.use_cases_input.bind(text=self.check_all_filled)
 
-    def check_all_filled(self, instance, value):
+    def check_all_filled(self, *args):
         # Check if all fields are filled, enable Send button if true
         if all([self.name_input.text, self.birth_date_input.text, self.education_input.text,
                 self.city_input.text, self.gender_input.text, self.ai_input.text,
@@ -243,13 +244,50 @@ class SurveyPage(GridLayout):
                 self.defects_input.text, self.use_cases_input.text]):
             # Implement sending survey data here
             print("Survey Data Sent!")
+            self.manager.current = 'success'
         else:
             print("Please fill in all fields before sending the survey data.")
+
+    def show_date_picker(self, instance):
+        popup = DatePickerPopup(self.birth_date_input)
+        popup.open()
+
+    def show_gender_popup(self, instance):
+        popup = GenderSelectionPopup(self.gender_input)
+        popup.open()
+
+    def show_ai_popup(self, instance):
+        options = ['ChatGPT', 'Bard', 'Claude', 'Copilot']
+        popup = SelectionPopup(options, self.ai_input, self.defects_input, 'Select AI Model')
+        popup.open()
+
+
+class SuccessPage(Screen):
+    def __init__(self, **kwargs):
+        super(SuccessPage, self).__init__(**kwargs)
+        layout = GridLayout(cols=1)
+
+        message_label = Label(text="Form successfully filled!")
+        layout.add_widget(message_label)
+
+        refill_button = Button(text='Refill', size_hint=(None, None), size=(100, 44))
+        refill_button.bind(on_press=self.refill_form)
+        layout.add_widget(refill_button)
+
+        self.add_widget(layout)
+
+    def refill_form(self, instance):
+        self.manager.current = 'survey'
 
 
 class SurveyApp(App):
     def build(self):
-        return SurveyPage()
+        sm = ScreenManager()
+        survey_page = SurveyPage(name='survey')
+        success_page = SuccessPage(name='success')
+        sm.add_widget(survey_page)
+        sm.add_widget(success_page)
+        return sm
 
 
 if __name__ == '__main__':
